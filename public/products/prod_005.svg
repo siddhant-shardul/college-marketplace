@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)" rx="32" />
+  <rect x="36" y="36" width="728" height="528" rx="24" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.18)" />
+  <text x="70" y="120" fill="white" font-size="28" font-family="Arial, Helvetica, sans-serif" opacity="0.9">Accessories</text>
+  <text x="70" y="220" fill="white" font-size="120" font-family="Arial, Helvetica, sans-serif">◎</text>
+  <text x="70" y="340" fill="white" font-size="48" font-weight="700" font-family="Arial, Helvetica, sans-serif">College Backpack</text>
+  <text x="70" y="405" fill="white" font-size="30" font-family="Arial, Helvetica, sans-serif" opacity="0.9">₹1299</text>
+  <text x="70" y="500" fill="white" font-size="22" font-family="Arial, Helvetica, sans-serif" opacity="0.75">College Marketplace Demo</text>
+</svg>
