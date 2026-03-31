@@ -54,20 +54,25 @@ export default function SignupPage() {
         return;
       }
 
-      if (data.user) {
-        const { error: profileError } = await supabase.from("profiles").upsert(
-          {
-            id: data.user.id,
-            full_name: trimmedName,
-            email: trimmedEmail,
-          },
-          { onConflict: "id" }
+      if (!data.session) {
+        setMessage(
+          "Account created. Check your email to verify your account before signing in."
         );
+        return;
+      }
 
-        if (profileError) {
-          setMessage("Signup worked, but profile was not saved.");
-          return;
-        }
+      const { error: profileError } = await supabase.from("profiles").upsert(
+        {
+          id: data.session.user.id,
+          full_name: trimmedName,
+          email: trimmedEmail,
+        },
+        { onConflict: "id" }
+      );
+
+      if (profileError) {
+        setMessage("Signup worked, but profile was not saved.");
+        return;
       }
 
       router.replace("/");

@@ -15,7 +15,6 @@ type Listing = {
   description: string;
   price: number;
   category_id: string;
-  seller_id: string;
 };
 
 export default function EditListingPage() {
@@ -34,6 +33,11 @@ export default function EditListingPage() {
 
   useEffect(() => {
     async function loadData() {
+      if (!listingId) {
+        router.replace("/my-listings");
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -45,18 +49,14 @@ export default function EditListingPage() {
 
       const { data: listing, error: listingError } = await supabase
         .from("listings")
-        .select("id, title, description, price, category_id, seller_id")
+        .select("id, title, description, price, category_id")
         .eq("id", listingId)
-        .single<Listing>();
+        .eq("seller_id", user.id)
+        .maybeSingle<Listing>();
 
       if (listingError || !listing) {
-        setMessage("Listing not found.");
+        setMessage("Listing not found or you do not have permission to edit it.");
         setLoading(false);
-        return;
-      }
-
-      if (listing.seller_id !== user.id) {
-        router.replace("/my-listings");
         return;
       }
 
@@ -79,9 +79,7 @@ export default function EditListingPage() {
       setLoading(false);
     }
 
-    if (listingId) {
-      loadData();
-    }
+    loadData();
   }, [listingId, router]);
 
   async function handleUpdate(e: React.FormEvent) {
@@ -90,6 +88,11 @@ export default function EditListingPage() {
     setSaving(true);
 
     try {
+      if (!listingId) {
+        setMessage("Invalid listing ID.");
+        return;
+      }
+
       const trimmedTitle = title.trim();
       const trimmedDescription = description.trim();
       const numericPrice = Number(price);
@@ -123,7 +126,7 @@ export default function EditListingPage() {
         return;
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("listings")
         .update({
           title: trimmedTitle,
@@ -132,18 +135,27 @@ export default function EditListingPage() {
           category_id: categoryId,
         })
         .eq("id", listingId)
-        .eq("seller_id", user.id);
+        .eq("seller_id", user.id)
+        .select("id")
+        .maybeSingle();
 
       if (error) {
         setMessage(error.message);
         return;
       }
 
+      if (!data) {
+        setMessage("Listing not found or you do not have permission to edit it.");
+        return;
+      }
+
       router.push("/my-listings");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to update listing.");
+      setMessage(
+        error instanceof Error ? error.message : "Failed to update listing."
+      );
     } finally {
-      setSaving(false);
+      setSaving(false); // ✅ ALWAYS runs
     }
   }
 

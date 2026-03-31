@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
 export default function Navbar() {
@@ -15,89 +16,77 @@ export default function Navbar() {
 
   useEffect(() => {
     let isMounted = true;
+    let requestId = 0;
 
-    async function loadUser() {
+    async function syncUser(user: User | null) {
+      const currentRequestId = ++requestId;
+
+      if (!isMounted) return;
+
+      if (!user) {
+        setUserEmail(null);
+        setUserName(null);
+        setLoadingUser(false);
+        return;
+      }
+
+      setUserEmail(user.email ?? null);
+      setUserName(null);
+      setLoadingUser(false);
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!isMounted || currentRequestId !== requestId) return;
+
+      if (profileError) {
+        console.error("Failed to load profile:", profileError.message);
+        setUserName(null);
+        return;
+      }
+
+      setUserName(profile?.full_name ?? null);
+    }
+
+    async function loadInitialUser() {
       try {
         const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          if (!isMounted) return;
-          setUserEmail(null);
-          setUserName(null);
-          setLoadingUser(false);
-          return;
-        }
-
-        const {
           data: { user },
-          error: userError,
+          error,
         } = await supabase.auth.getUser();
 
-        if (userError) {
-          console.error("Failed to load user:", userError.message);
-          if (!isMounted) return;
-          setUserEmail(null);
-          setUserName(null);
-          setLoadingUser(false);
+        if (error) {
+          console.error("Failed to load user:", error.message);
+          await syncUser(null);
           return;
         }
 
-        if (!isMounted) return;
-
-        if (!user) {
-          setUserEmail(null);
-          setUserName(null);
-          setLoadingUser(false);
-          return;
-        }
-
-        setUserEmail(user.email ?? null);
-
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (!isMounted) return;
-
-        if (profileError) {
-          console.error("Failed to load profile:", profileError.message);
-          setUserName(null);
-        } else {
-          setUserName(profile?.full_name ?? null);
-        }
-
-        setLoadingUser(false);
+        await syncUser(user ?? null);
       } catch (error: any) {
         if (error?.message?.includes("Auth session missing")) {
-          if (!isMounted) return;
-          setUserEmail(null);
-          setUserName(null);
-          setLoadingUser(false);
+          await syncUser(null);
           return;
         }
 
         console.error("Failed to load user:", error);
-        if (!isMounted) return;
-        setUserEmail(null);
-        setUserName(null);
-        setLoadingUser(false);
+        await syncUser(null);
       }
     }
 
-    loadUser();
+    loadInitialUser();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      loadUser();
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      void syncUser(session?.user ?? null);
     });
 
     return () => {
       isMounted = false;
+      requestId += 1;
       subscription.unsubscribe();
     };
   }, []);

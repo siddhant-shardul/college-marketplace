@@ -152,10 +152,15 @@ export default function ListingDetailPage() {
           },
         ])
         .select("id")
-        .single();
+        .maybeSingle();
 
       if (createError) {
         setMessage(`Failed to start conversation: ${createError.message}`);
+        return;
+      }
+
+      if (!newConversation) {
+        setMessage("Failed to start conversation.");
         return;
       }
 

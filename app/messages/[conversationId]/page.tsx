@@ -11,13 +11,6 @@ type MessageRow = {
   created_at: string;
 };
 
-type ConversationRow = {
-  id: string;
-  buyer_id: string;
-  seller_id: string;
-  listing_id: string;
-};
-
 export default function MessagesPage() {
   const params = useParams<{ conversationId: string }>();
   const router = useRouter();
@@ -51,29 +44,22 @@ export default function MessagesPage() {
 
     setCurrentUserId(user.id);
 
-    const { data: conversationData, error: conversationError } = await supabase
-      .from("conversations")
-      .select("id, buyer_id, seller_id, listing_id")
-      .eq("id", conversationId)
-      .maybeSingle();
+    // ✅ FIX 1: Enforce ownership in query (NO read-before-check leak)
+    const { data: conversationData, error: conversationError } =
+      await supabase
+        .from("conversations")
+        .select("id")
+        .eq("id", conversationId)
+        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+        .maybeSingle();
 
     if (conversationError || !conversationData) {
-      setMessage("Conversation not found.");
+      setMessage("Conversation not found or access denied.");
       setLoading(false);
       return;
     }
 
-    const typedConversation = conversationData as ConversationRow;
-
-    if (
-      typedConversation.buyer_id !== user.id &&
-      typedConversation.seller_id !== user.id
-    ) {
-      setMessage("You are not allowed to view this conversation.");
-      setLoading(false);
-      return;
-    }
-
+    // ✅ FIX 2: Messages already protected by RLS, but still scoped properly
     const { data: messagesData, error: messagesError } = await supabase
       .from("messages")
       .select("id, sender_id, content, created_at")
@@ -91,7 +77,6 @@ export default function MessagesPage() {
   }, [conversationId, router]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadConversation();
   }, [loadConversation]);
 
@@ -119,16 +104,27 @@ export default function MessagesPage() {
     setSending(true);
     setMessage("");
 
-    const { error } = await supabase.from("messages").insert([
-      {
-        conversation_id: conversationId,
-        sender_id: user.id,
-        content: trimmedContent,
-      },
-    ]);
+    // ✅ FIX 3: Require inserted row (no silent failure)
+    const { data, error } = await supabase
+      .from("messages")
+      .insert([
+        {
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: trimmedContent,
+        },
+      ])
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       setMessage(`Failed to send message: ${error.message}`);
+      setSending(false);
+      return;
+    }
+
+    if (!data) {
+      setMessage("Message not sent. You may not have permission.");
       setSending(false);
       return;
     }
