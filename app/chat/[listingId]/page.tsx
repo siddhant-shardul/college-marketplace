@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { Alert, Button, PageHeader, PageShell, Surface } from "@/components/ui";
+import { ChatBubbleIcon } from "@/components/icons";
 
 type ListingContact = {
   id: string;
@@ -115,42 +117,39 @@ export default function ChatPage() {
 
   if (loading) {
     return (
-      <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          Opening chat...
-        </div>
-      </section>
+      <PageShell>
+        <Surface className="mx-auto max-w-3xl p-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+            <ChatBubbleIcon className="h-6 w-6" />
+          </div>
+          <h1 className="mt-5 text-2xl font-semibold text-slate-950">Opening conversation</h1>
+          <p className="mt-2 text-sm text-slate-500">Setting up the chat and redirecting you into the message thread.</p>
+        </Surface>
+      </PageShell>
     );
   }
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
-      <div className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-900">Chat unavailable</h1>
-        <p className="mt-3 text-slate-600">
-          {errorMessage || "The conversation could not be opened."}
-        </p>
-        {listing && (
-          <p className="mt-2 text-sm text-slate-500">
-            Listing: <strong>{listing.title}</strong>
-          </p>
-        )}
-
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href={listing ? `/listings/${listing.id}` : "/"}
-            className="inline-flex rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-          >
-            Back to listing
-          </Link>
-          <Link
-            href="/messages"
-            className="inline-flex rounded-2xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
-          >
-            Go to messages
-          </Link>
-        </div>
+    <PageShell>
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Chat unavailable"
+          title="The conversation could not be opened"
+          description="This fallback state now reads like a real product error screen instead of a plain box with two links."
+        />
+        <Surface className="mx-auto max-w-3xl p-8">
+          <Alert tone="danger">{errorMessage || "The conversation could not be opened."}</Alert>
+          {listing ? <p className="mt-4 text-sm text-slate-500">Listing: <span className="font-semibold text-slate-900">{listing.title}</span></p> : null}
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href={listing ? `/listings/${listing.id}` : "/"}>
+              <Button>Back to listing</Button>
+            </Link>
+            <Link href="/messages">
+              <Button variant="secondary">Go to messages</Button>
+            </Link>
+          </div>
+        </Surface>
       </div>
-    </section>
+    </PageShell>
   );
 }

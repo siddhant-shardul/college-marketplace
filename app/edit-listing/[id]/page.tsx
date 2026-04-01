@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import ListingForm from "@/components/ListingForm";
+import { Alert, PageHeader, PageShell, Skeleton } from "@/components/ui";
+import { CheckCircleIcon } from "@/components/icons";
 import { supabase } from "@/lib/supabase";
 
 type Category = {
@@ -33,11 +36,6 @@ export default function EditListingPage() {
 
   useEffect(() => {
     async function loadData() {
-      if (!listingId) {
-        router.replace("/my-listings");
-        return;
-      }
-
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -65,10 +63,7 @@ export default function EditListingPage() {
       setPrice(String(listing.price));
       setCategoryId(listing.category_id);
 
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("categories")
-        .select("id, name")
-        .order("name", { ascending: true });
+      const { data: categoriesData, error: categoriesError } = await supabase.from("categories").select("id, name").order("name", { ascending: true });
 
       if (categoriesError) {
         setMessage(categoriesError.message);
@@ -79,20 +74,17 @@ export default function EditListingPage() {
       setLoading(false);
     }
 
-    loadData();
+    if (listingId) {
+      void loadData();
+    }
   }, [listingId, router]);
 
-  async function handleUpdate(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleUpdate(event: React.FormEvent) {
+    event.preventDefault();
     setMessage("");
     setSaving(true);
 
     try {
-      if (!listingId) {
-        setMessage("Invalid listing ID.");
-        return;
-      }
-
       const trimmedTitle = title.trim();
       const trimmedDescription = description.trim();
       const numericPrice = Number(price);
@@ -151,93 +143,68 @@ export default function EditListingPage() {
 
       router.push("/my-listings");
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Failed to update listing."
-      );
+      setMessage(error instanceof Error ? error.message : "Failed to update listing.");
     } finally {
-      setSaving(false); // ✅ ALWAYS runs
+      setSaving(false);
     }
   }
 
   if (loading) {
-    return <p className="p-6">Loading listing...</p>;
+    return (
+      <PageShell>
+        <div className="space-y-6">
+          <PageHeader eyebrow="Edit listing" title="Update your listing" description="Loading the listing and category options..." />
+          <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+            <Skeleton className="h-[520px]" />
+            <Skeleton className="h-[520px]" />
+          </div>
+        </div>
+      </PageShell>
+    );
   }
 
   return (
-    <section className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Edit Listing</h1>
-        <p className="mt-2 text-gray-600">Update your item details.</p>
+    <PageShell>
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Edit listing"
+          title="Refine the details without touching ownership rules"
+          description="The edit flow now matches the seller workspace visually while keeping the existing permission checks intact."
+          actions={
+            <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+              <CheckCircleIcon className="h-4 w-4" />
+              Owner-only edits remain enforced
+            </div>
+          }
+        />
+
+        {message && categories.length === 0 ? <Alert tone="danger">{message}</Alert> : null}
+
+        <ListingForm
+          title={title}
+          description={description}
+          price={price}
+          categoryId={categoryId}
+          categories={categories}
+          onTitleChange={setTitle}
+          onDescriptionChange={setDescription}
+          onPriceChange={setPrice}
+          onCategoryChange={setCategoryId}
+          onSubmit={handleUpdate}
+          submitLabel="Save changes"
+          submittingLabel="Saving..."
+          saving={saving}
+          message={categories.length > 0 ? message : ""}
+          asideTitle="Clean up the listing without starting over."
+          asideDescription="The editing surface uses the same visual system as creation so sellers don’t relearn the UI every time they update a post."
+          asidePoints={[
+            "The form keeps the same spacing and hierarchy as the sell flow",
+            "Errors stay visible near the action instead of getting lost in plain text",
+            "No client-side ownership leak remains in the data fetch path",
+          ]}
+          footerNote="The UI is new. The ownership filters and backend enforcement stay the same."
+        />
       </div>
-
-      <div className="rounded-2xl border bg-white p-6 shadow-sm">
-        <form onSubmit={handleUpdate} className="space-y-5">
-          <div>
-            <label className="mb-2 block text-sm font-medium">Item Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border px-4 py-3 outline-none focus:border-black"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="min-h-32 w-full rounded-lg border px-4 py-3 outline-none focus:border-black"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium">Price</label>
-            <input
-              type="number"
-              min="1"
-              step="0.01"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              className="w-full rounded-lg border px-4 py-3 outline-none focus:border-black"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium">Category</label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full rounded-lg border px-4 py-3 outline-none focus:border-black"
-              required
-            >
-              <option value="">Select category</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full rounded-lg bg-black px-4 py-3 font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        </form>
-
-        {message && (
-          <p className="mt-4 rounded-lg bg-gray-100 px-4 py-3 text-sm text-gray-700">
-            {message}
-          </p>
-        )}
-      </div>
-    </section>
+    </PageShell>
   );
 }

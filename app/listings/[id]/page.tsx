@@ -4,6 +4,9 @@ import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { Alert, Badge, Button, EmptyState, PageHeader, PageShell, Skeleton, Surface } from "@/components/ui";
+import { ChatBubbleIcon, CheckCircleIcon, PhotoIcon } from "@/components/icons";
+import { formatCurrency, formatShortDate } from "@/lib/format";
 
 type ListingQueryRow = {
   id: string;
@@ -30,10 +33,7 @@ type Listing = {
 };
 
 function getCategoryName(categories: ListingQueryRow["categories"]) {
-  if (!categories) {
-    return null;
-  }
-
+  if (!categories) return null;
   return Array.isArray(categories) ? categories[0]?.name ?? null : categories.name;
 }
 
@@ -61,18 +61,16 @@ export default function ListingDetailPage() {
       .from("listings")
       .select(
         `
-        id,
-        seller_id,
-        title,
-        description,
-        price,
-        image_url,
-        status,
-        created_at,
-        categories (
-          name
-        )
-      `,
+          id,
+          seller_id,
+          title,
+          description,
+          price,
+          image_url,
+          status,
+          created_at,
+          categories ( name )
+        `,
       )
       .eq("id", listingId)
       .maybeSingle();
@@ -85,7 +83,6 @@ export default function ListingDetailPage() {
     }
 
     const row = data as ListingQueryRow;
-
     setListing({
       id: row.id,
       seller_id: row.seller_id,
@@ -152,23 +149,16 @@ export default function ListingDetailPage() {
           },
         ])
         .select("id")
-        .maybeSingle();
+        .single();
 
       if (createError) {
         setMessage(`Failed to start conversation: ${createError.message}`);
         return;
       }
 
-      if (!newConversation) {
-        setMessage("Failed to start conversation.");
-        return;
-      }
-
       router.push(`/messages/${newConversation.id}`);
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Failed to contact seller.",
-      );
+      setMessage(error instanceof Error ? error.message : "Failed to contact seller.");
     } finally {
       setStartingConversation(false);
     }
@@ -176,88 +166,106 @@ export default function ListingDetailPage() {
 
   if (loading) {
     return (
-      <section className="p-6">
-        <div className="mx-auto max-w-4xl rounded-2xl border bg-white p-6 shadow-sm">
-          Loading listing...
+      <PageShell>
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <Skeleton className="h-[420px]" />
+          <Skeleton className="h-[420px]" />
         </div>
-      </section>
+      </PageShell>
     );
   }
 
   if (!listing) {
     return (
-      <section className="p-6">
-        <div className="mx-auto max-w-4xl rounded-2xl border bg-white p-6 shadow-sm">
-          Listing not found.
-        </div>
-      </section>
+      <PageShell>
+        <EmptyState
+          title="Listing not found"
+          description={message || "The item could not be loaded."}
+          action={<Button onClick={() => router.push("/")}>Back to marketplace</Button>}
+        />
+      </PageShell>
     );
   }
 
   return (
-    <section className="p-6">
-      <div className="mx-auto grid max-w-5xl gap-8 rounded-3xl border bg-white p-6 shadow-sm md:grid-cols-2">
-        <div>
-          {listing.image_url ? (
-            <div className="relative h-96 w-full overflow-hidden rounded-2xl bg-slate-100">
-              <Image
-                src={listing.image_url}
-                alt={listing.title}
-                fill
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
-                unoptimized
-              />
+    <PageShell>
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow={listing.category_name ?? "Listing"}
+          title={listing.title}
+          description="The detail page now uses clearer product hierarchy, stronger image treatment, and a cleaner action panel for messaging."
+        />
+
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <Surface className="overflow-hidden p-3">
+            {listing.image_url ? (
+              <div className="relative h-[320px] overflow-hidden rounded-[24px] bg-slate-100 sm:h-[520px]">
+                <Image
+                  src={listing.image_url}
+                  alt={listing.title}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 60vw"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : (
+              <div className="flex h-[320px] items-center justify-center rounded-[24px] bg-slate-100 text-slate-500 sm:h-[520px]">
+                <div className="flex flex-col items-center gap-3">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-600 shadow-sm">
+                    <PhotoIcon className="h-6 w-6" />
+                  </span>
+                  <p className="text-sm font-medium">No image available</p>
+                </div>
+              </div>
+            )}
+          </Surface>
+
+          <Surface className="p-6 sm:p-8">
+            <div className="flex flex-wrap items-center gap-2">
+              {listing.category_name ? <Badge tone="brand">{listing.category_name}</Badge> : null}
+              <Badge tone={listing.status === "active" ? "success" : "warning"}>{listing.status}</Badge>
+              <span className="text-sm text-slate-500">Posted {formatShortDate(listing.created_at)}</span>
             </div>
-          ) : (
-            <div className="flex h-96 w-full items-center justify-center rounded-2xl bg-slate-200 text-slate-600">
-              No image available
+
+            <p className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">{formatCurrency(listing.price)}</p>
+            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600 sm:text-base">{listing.description}</p>
+
+            <div className="mt-8 rounded-[24px] border border-slate-200 bg-slate-50/90 p-5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
+                  <ChatBubbleIcon className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-semibold text-slate-950">Contact the seller</p>
+                  <p className="text-sm text-slate-500">Start a conversation without leaving the marketplace.</p>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={handleContactSeller}
+                disabled={startingConversation || listing.status !== "active"}
+                size="lg"
+                className="mt-5 w-full"
+              >
+                {startingConversation ? "Opening chat..." : "Message seller"}
+              </Button>
+
+              {listing.status !== "active" ? (
+                <p className="mt-3 text-sm text-rose-600">This listing is not currently available for new conversations.</p>
+              ) : (
+                <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+                  <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
+                  Messaging is kept inside the app.
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="flex flex-col">
-          <p className="text-sm text-slate-500">
-            {listing.category_name || "Unknown category"}
-          </p>
-
-          <h1 className="mt-2 text-3xl font-bold text-slate-900">{listing.title}</h1>
-
-          <p className="mt-4 text-2xl font-semibold text-slate-900">₹{listing.price}</p>
-
-          <p className="mt-3 inline-flex w-fit rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
-            Status: {listing.status}
-          </p>
-
-          <div className="mt-6">
-            <h2 className="text-lg font-semibold text-slate-900">Description</h2>
-            <p className="mt-2 whitespace-pre-line leading-7 text-slate-600">
-              {listing.description}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleContactSeller}
-            disabled={startingConversation || listing.status !== "active"}
-            className="mt-8 inline-flex items-center justify-center rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {startingConversation ? "Opening chat..." : "Contact Seller"}
-          </button>
-
-          {listing.status !== "active" && (
-            <p className="mt-3 text-sm text-red-600">
-              This listing is not currently available for new conversations.
-            </p>
-          )}
-
-          {message && (
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              {message}
-            </div>
-          )}
+            {message ? <Alert tone="danger" className="mt-5">{message}</Alert> : null}
+          </Surface>
         </div>
       </div>
-    </section>
+    </PageShell>
   );
 }

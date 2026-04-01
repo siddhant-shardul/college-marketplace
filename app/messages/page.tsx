@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { Alert, Badge, Button, EmptyState, PageHeader, PageShell, Skeleton, Surface } from "@/components/ui";
+import { ArrowRightIcon, ChatBubbleIcon } from "@/components/icons";
+import { formatRelativeTime, getInitials } from "@/lib/format";
 
 type ConversationRow = {
   id: string;
@@ -21,19 +24,16 @@ type ConversationCard = {
   seller_id: string;
   title: string;
   image_url: string | null;
+  created_at: string;
 };
 
 function getListingSummary(listing: ConversationRow["listings"]) {
-  if (!listing) {
-    return { title: "Listing", image_url: null };
-  }
-
-  return Array.isArray(listing) ? (listing[0] ?? { title: "Listing", image_url: null }) : listing;
+  if (!listing) return { title: "Listing", image_url: null };
+  return Array.isArray(listing) ? listing[0] ?? { title: "Listing", image_url: null } : listing;
 }
 
 export default function MessagesInboxPage() {
   const router = useRouter();
-
   const [conversations, setConversations] = useState<ConversationCard[]>([]);
   const [currentUserId, setCurrentUserId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -89,6 +89,7 @@ export default function MessagesInboxPage() {
         seller_id: conversation.seller_id,
         title: listingSummary.title,
         image_url: listingSummary.image_url,
+        created_at: conversation.created_at,
       };
     });
 
@@ -103,78 +104,91 @@ export default function MessagesInboxPage() {
 
   if (loading) {
     return (
-      <section className="p-6">
-        <div className="mx-auto max-w-4xl rounded-2xl border bg-white p-6 shadow-sm">
-          Loading conversations...
+      <PageShell>
+        <div className="space-y-6">
+          <PageHeader eyebrow="Messages" title="Your inbox" description="Loading conversations..." />
+          <div className="grid gap-4">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Skeleton key={index} className="h-24" />
+            ))}
+          </div>
         </div>
-      </section>
+      </PageShell>
     );
   }
 
   return (
-    <section className="p-6">
-      <div className="mx-auto max-w-4xl rounded-3xl border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold text-slate-900">Your Messages</h1>
-        <p className="mt-2 text-sm text-slate-500">
-          Open a conversation to continue chatting with a buyer or seller.
-        </p>
+    <PageShell>
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Messages"
+          title="A cleaner conversation inbox"
+          description="The messaging list now behaves like an actual inbox: stronger previews, better spacing, and clear context about your role in each conversation."
+        />
 
-        {message && (
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-            {message}
-          </div>
-        )}
+        {message ? <Alert tone="danger">{message}</Alert> : null}
 
-        <div className="mt-6 space-y-4">
-          {conversations.length === 0 ? (
-            <div className="rounded-2xl bg-slate-50 px-4 py-6 text-sm text-slate-500">
-              No conversations yet.
-            </div>
-          ) : (
-            conversations.map((conversation) => {
+        {conversations.length === 0 ? (
+          <EmptyState
+            title="No conversations yet"
+            description="Once you contact a seller or a buyer replies, the thread will show up here with stronger visual context than before."
+            action={
+              <Link href="/">
+                <Button>
+                  <ChatBubbleIcon className="h-4 w-4" />
+                  Browse listings
+                </Button>
+              </Link>
+            }
+            icon={<ChatBubbleIcon className="h-6 w-6" />}
+          />
+        ) : (
+          <div className="space-y-4">
+            {conversations.map((conversation) => {
               const isBuyer = currentUserId === conversation.buyer_id;
+              const titleInitials = getInitials(conversation.title);
 
               return (
-                <Link
-                  key={conversation.id}
-                  href={`/messages/${conversation.id}`}
-                  className="block"
-                >
-                  <div className="flex items-center gap-4 rounded-2xl border p-4 transition hover:shadow">
-                    {conversation.image_url ? (
-                      <div className="relative h-16 w-16 overflow-hidden rounded-xl bg-slate-100">
-                        <Image
-                          src={conversation.image_url}
-                          alt={conversation.title}
-                          fill
-                          sizes="64px"
-                          className="object-cover"
-                          unoptimized
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-200 text-xs text-slate-600">
-                        No Image
-                      </div>
-                    )}
+                <Link key={conversation.id} href={`/messages/${conversation.id}`} className="block">
+                  <Surface className="p-4 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(15,23,42,0.10)] sm:p-5">
+                    <div className="flex items-center gap-4">
+                      {conversation.image_url ? (
+                        <div className="relative h-16 w-16 overflow-hidden rounded-2xl bg-slate-100">
+                          <Image
+                            src={conversation.image_url}
+                            alt={conversation.title}
+                            fill
+                            sizes="64px"
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-sm font-semibold text-slate-600">
+                          {titleInitials}
+                        </div>
+                      )}
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-slate-900">
-                        {conversation.title}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {isBuyer ? "You are the buyer" : "You are the seller"}
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="truncate text-base font-semibold text-slate-950 sm:text-lg">{conversation.title}</h2>
+                          <Badge tone={isBuyer ? "brand" : "neutral"}>{isBuyer ? "You are buying" : "You are selling"}</Badge>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-500">Opened {formatRelativeTime(conversation.created_at)}</p>
+                      </div>
+
+                      <div className="hidden items-center gap-2 text-sm font-semibold text-slate-700 sm:flex">
+                        Open thread
+                        <ArrowRightIcon className="h-4 w-4" />
+                      </div>
                     </div>
-
-                    <span className="text-sm text-slate-400">→</span>
-                  </div>
+                  </Surface>
                 </Link>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
-    </section>
+    </PageShell>
   );
 }

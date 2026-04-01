@@ -11,4 +11,11 @@ if (!supabaseAnonKey) {
   throw new Error("Missing required environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const verifiedSupabaseUrl = supabaseUrl;
+const verifiedSupabaseAnonKey = supabaseAnonKey;
+
+export function createSupabaseServerClient() {
+  return createClient(verifiedSupabaseUrl, verifiedSupabaseAnonKey);
+}
+
+export const supabase = createClient(verifiedSupabaseUrl, verifiedSupabaseAnonKey);

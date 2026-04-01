@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "College Marketplace",
-  description: "Buy and sell items inside your campus",
+  title: {
+    default: "College Marketplace",
+    template: "%s • College Marketplace",
+  },
+  description: "Buy, sell, and chat with students on your campus.",
 };
 
 export default function RootLayout({
@@ -24,13 +27,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-screen bg-slate-50 text-slate-900">
-        <Navbar />
-        <main className="w-full">{children}</main>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <body className="min-h-screen text-slate-900">
+        <div className="relative min-h-screen">
+          <div className="absolute inset-x-0 top-0 -z-10 h-80 bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.16),_transparent_45%)]" />
+          <Navbar />
+          <main className="relative z-10 w-full pb-10">{children}</main>
+        </div>
       </body>
     </html>
   );
