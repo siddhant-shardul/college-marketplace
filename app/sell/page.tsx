@@ -70,19 +70,20 @@ export default function SellPage() {
       const trimmedDescription = description.trim();
       const numericPrice = Number(price);
 
-      // Validation
       if (!trimmedTitle) return setMessage("Title is required.");
       if (!trimmedDescription) return setMessage("Description is required.");
       if (!categoryId) return setMessage("Category is required.");
-      if (!Number.isFinite(numericPrice) || numericPrice <= 0)
+      if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
         return setMessage("Price must be greater than 0.");
+      }
       if (!image) return setMessage("Image is required.");
-      if (!allowedImageTypes.includes(image.type))
+      if (!allowedImageTypes.includes(image.type)) {
         return setMessage("Only JPG, PNG, WebP allowed.");
-      if (image.size > maxImageSizeInBytes)
+      }
+      if (image.size > maxImageSizeInBytes) {
         return setMessage("Image must be ≤ 5MB.");
+      }
 
-      // Get user
       const {
         data: { user },
         error: userError,
@@ -93,7 +94,6 @@ export default function SellPage() {
         return;
       }
 
-      // Upload image
       const ext = image.name.split(".").pop()?.toLowerCase() || "jpg";
       const filePath = `${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
@@ -110,12 +110,11 @@ export default function SellPage() {
         .from("listing-images")
         .getPublicUrl(filePath);
 
-      // Insert listing (STRICT)
       const { data, error } = await supabase
         .from("listings")
         .insert([
           {
-            seller_id: user.id, // 🔥 REQUIRED for RLS
+            seller_id: user.id,
             category_id: categoryId,
             title: trimmedTitle,
             description: trimmedDescription,
@@ -132,19 +131,20 @@ export default function SellPage() {
         return;
       }
 
-      // 🔴 Critical check (prevents fake success)
       if (!data) {
         setMessage("Insert failed due to permission or validation.");
         return;
       }
 
-      // Reset form
       setTitle("");
       setDescription("");
       setPrice("");
       setCategoryId("");
       setImage(null);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
 
       router.push("/");
     } catch (err) {
@@ -205,15 +205,16 @@ export default function SellPage() {
           submittingLabel="Publishing..."
           saving={submitting}
           message={message}
+          asideTitle="Listing tips"
+          asideDescription="Clear photos, honest details, and a fair price help your item sell faster."
+          footerNote="Images must be JPG, PNG, or WebP and 5MB or smaller."
           imageInput={
             <div className="space-y-3">
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
-                onChange={(e) =>
-                  setImage(e.target.files?.[0] || null)
-                }
+                onChange={(e) => setImage(e.target.files?.[0] || null)}
                 required
               />
               {image && <p>{image.name}</p>}
