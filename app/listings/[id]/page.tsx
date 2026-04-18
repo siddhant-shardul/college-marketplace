@@ -4,8 +4,21 @@ import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Alert, Badge, Button, EmptyState, PageHeader, PageShell, Skeleton, Surface } from "@/components/ui";
-import { ChatBubbleIcon, CheckCircleIcon, PhotoIcon } from "@/components/icons";
+import {
+  Alert,
+  Badge,
+  Button,
+  EmptyState,
+  PageHeader,
+  PageShell,
+  Skeleton,
+  Surface,
+} from "@/components/ui";
+import {
+  ChatBubbleIcon,
+  CheckCircleIcon,
+  PhotoIcon,
+} from "@/components/icons";
 import { formatCurrency, formatShortDate } from "@/lib/format";
 
 type ListingQueryRow = {
@@ -30,6 +43,10 @@ type Listing = {
   status: string;
   created_at: string;
   category_name: string | null;
+};
+
+type ConversationLookupRow = {
+  id: string;
 };
 
 function getCategoryName(categories: ListingQueryRow["categories"]) {
@@ -70,19 +87,20 @@ export default function ListingDetailPage() {
           status,
           created_at,
           categories ( name )
-        `,
+        `
       )
       .eq("id", listingId)
       .maybeSingle();
 
     if (error || !data) {
-      setMessage("Failed to load listing.");
+      setMessage(error?.message || "Failed to load listing.");
       setListing(null);
       setLoading(false);
       return;
     }
 
     const row = data as ListingQueryRow;
+
     setListing({
       id: row.id,
       seller_id: row.seller_id,
@@ -94,6 +112,7 @@ export default function ListingDetailPage() {
       created_at: row.created_at,
       category_name: getCategoryName(row.categories),
     });
+
     setLoading(false);
   }, [listingId]);
 
@@ -110,9 +129,10 @@ export default function ListingDetailPage() {
     try {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) {
+      if (userError || !user) {
         router.push("/login");
         return;
       }
@@ -122,17 +142,20 @@ export default function ListingDetailPage() {
         return;
       }
 
-      const { data: existingConversation, error: existingError } = await supabase
+      const { data: existingRows, error: existingError } = await supabase
         .from("conversations")
         .select("id")
         .eq("listing_id", listing.id)
         .eq("buyer_id", user.id)
-        .maybeSingle();
+        .eq("seller_id", listing.seller_id)
+        .limit(1);
 
       if (existingError) {
-        setMessage("Failed to check existing conversation.");
+        setMessage(`Failed to check existing conversation: ${existingError.message}`);
         return;
       }
+
+      const existingConversation = (existingRows as ConversationLookupRow[] | null)?.[0];
 
       if (existingConversation) {
         router.push(`/messages/${existingConversation.id}`);
@@ -149,16 +172,23 @@ export default function ListingDetailPage() {
           },
         ])
         .select("id")
-        .single();
+        .maybeSingle();
 
       if (createError) {
         setMessage(`Failed to start conversation: ${createError.message}`);
         return;
       }
 
+      if (!newConversation) {
+        setMessage("Failed to start conversation.");
+        return;
+      }
+
       router.push(`/messages/${newConversation.id}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to contact seller.");
+      setMessage(
+        error instanceof Error ? error.message : "Failed to contact seller."
+      );
     } finally {
       setStartingConversation(false);
     }
@@ -181,7 +211,9 @@ export default function ListingDetailPage() {
         <EmptyState
           title="Listing not found"
           description={message || "The item could not be loaded."}
-          action={<Button onClick={() => router.push("/")}>Back to marketplace</Button>}
+          action={
+            <Button onClick={() => router.push("/")}>Back to marketplace</Button>
+          }
         />
       </PageShell>
     );
@@ -223,13 +255,24 @@ export default function ListingDetailPage() {
 
           <Surface className="p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2">
-              {listing.category_name ? <Badge tone="brand">{listing.category_name}</Badge> : null}
-              <Badge tone={listing.status === "active" ? "success" : "warning"}>{listing.status}</Badge>
-              <span className="text-sm text-slate-500">Posted {formatShortDate(listing.created_at)}</span>
+              {listing.category_name ? (
+                <Badge tone="brand">{listing.category_name}</Badge>
+              ) : null}
+              <Badge tone={listing.status === "active" ? "success" : "warning"}>
+                {listing.status}
+              </Badge>
+              <span className="text-sm text-slate-500">
+                Posted {formatShortDate(listing.created_at)}
+              </span>
             </div>
 
-            <p className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">{formatCurrency(listing.price)}</p>
-            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600 sm:text-base">{listing.description}</p>
+            <p className="mt-5 text-3xl font-semibold tracking-tight text-slate-950">
+              {formatCurrency(listing.price)}
+            </p>
+
+            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-600 sm:text-base">
+              {listing.description}
+            </p>
 
             <div className="mt-8 rounded-[24px] border border-slate-200 bg-slate-50/90 p-5">
               <div className="flex items-center gap-3">
@@ -238,7 +281,9 @@ export default function ListingDetailPage() {
                 </span>
                 <div>
                   <p className="font-semibold text-slate-950">Contact the seller</p>
-                  <p className="text-sm text-slate-500">Start a conversation without leaving the marketplace.</p>
+                  <p className="text-sm text-slate-500">
+                    Start a conversation without leaving the marketplace.
+                  </p>
                 </div>
               </div>
 
@@ -253,16 +298,22 @@ export default function ListingDetailPage() {
               </Button>
 
               {listing.status !== "active" ? (
-                <p className="mt-3 text-sm text-rose-600">This listing is not currently available for new conversations.</p>
+                <p className="mt-3 text-sm text-rose-600">
+                  This listing is not currently available for new conversations.
+                </p>
               ) : (
                 <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
                   <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
                   Messaging is kept inside the app.
                 </div>
               )}
-            </div>
 
-            {message ? <Alert tone="danger" className="mt-5">{message}</Alert> : null}
+              {message ? (
+                <Alert tone="danger" className="mt-5">
+                  {message}
+                </Alert>
+              ) : null}
+            </div>
           </Surface>
         </div>
       </div>
